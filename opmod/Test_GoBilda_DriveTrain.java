@@ -55,7 +55,6 @@ public class Test_GoBilda_DriveTrain extends OpMode {
 
     @Override
     public void init() {
-
         IsLeftTrigger=false;
         IsRightTrigger=false;
         ExtendDrop=false;
@@ -72,9 +71,6 @@ public class Test_GoBilda_DriveTrain extends OpMode {
         outake=hardwareMap.get(Servo.class,"outake");
         Pick = hardwareMap.dcMotor.get("pick");
         Drop = hardwareMap.dcMotor.get("drop");
-
-
-
         //DriveTrain
         Fright.setDirection(DcMotorSimple.Direction.REVERSE);
         Bright.setDirection(DcMotorSimple.Direction.REVERSE);
@@ -101,10 +97,12 @@ public class Test_GoBilda_DriveTrain extends OpMode {
         hand.setPosition(0);
         RoClaw.setPosition(0.45);
         SpecClaw.setPosition(0);//
-        arm.setPosition(0.093);
-        outake.setPosition(0.45);
+        arm.setPosition(0.20);
+        outake.setPosition(0.5);
         //claw.setPosition(0);
         ClawOpen();
+
+
 
 //DriveTrain Encoders
        // FLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
@@ -125,7 +123,6 @@ public class Test_GoBilda_DriveTrain extends OpMode {
         CreateDropLinearSlideThread();
 
     }
-
     private void CreateDropLinearSlideThread() {
         DropLinearSlideThread=new Thread(() ->{
             while (true){
@@ -136,8 +133,8 @@ public class Test_GoBilda_DriveTrain extends OpMode {
                     }
                 }
             }
-        }
-        );  }
+        });
+    }
 
     private void CreateDriveTrainThread() {
         DriveTrainThread=new Thread(() ->{
@@ -180,7 +177,6 @@ public class Test_GoBilda_DriveTrain extends OpMode {
                if (IsRightTrigger) {
                    GoToTheSample();
                    IsRightTrigger=false;
-
                }
                try {
                    Thread.sleep(10);
@@ -189,14 +185,9 @@ public class Test_GoBilda_DriveTrain extends OpMode {
 
                }
             }
-
-
         });
-
-
-
-
     }
+
     @Override
     public void start (){
         SampleTransferThread.start();
@@ -207,8 +198,6 @@ public class Test_GoBilda_DriveTrain extends OpMode {
     }
     @Override
     public void loop() {
-
-
         telemetry.addData("Linear slid Currently at", " at %7d",
                 Pick.getCurrentPosition());
 
@@ -241,37 +230,40 @@ public class Test_GoBilda_DriveTrain extends OpMode {
         if (gamepad1.right_trigger >0) {
             IsRightTrigger=true;
         }
-
+        // pick the sample
         if (gamepad1.y){
             GrabTheSample();
             //ClawClose();
         }
-
+        // bring the sample to outtake claw
         if (gamepad1.left_trigger>0){
             //sampleDeposit();
             IsLeftTrigger=true;
         }
+        // go and get ready to pick the sample
         if (gamepad1.a) {
             //ClawOpen();
             prepareHandToGrab();
         }
+        //drop the sample in the bucket
         if (gamepad1.b){
             //ClawOpen();
             ExtendDrop=false;
-            isHold=false;
             dropTheSample();
         }
+        // claw and linear slide go to the sample transfer position
         if(gamepad1.left_bumper)
         {
             roClowPos+=0.025;
             RoClaw.setPosition(roClowPos);
         }
+        // claw and linear slide go to the sample pickup position
         if(gamepad1.right_bumper)
         {
             roClowPos-=0.025;
             RoClaw.setPosition(roClowPos);
         }
-        Pick.setPower(gamepad2.right_trigger);
+
          if (gamepad1.dpad_left){
              GrabSpec();
          }
@@ -285,8 +277,18 @@ public class Test_GoBilda_DriveTrain extends OpMode {
          }
          if (gamepad1.dpad_down){
              ExtendDrop=false;
-             DropExtendINCH(-4);//TO get it back to the zero position
+             isHold=false;
+             DropExtendINCH(0);//TO get it back to the zero position
          }
+
+        double temp=gamepad1.left_stick_y;
+        if (temp !=0) {
+            ExtendDrop=false;
+        }
+
+        Drop.setPower(-gamepad1.left_stick_y); // reverse
+
+        // gamepad 2-for manual control in case asign task failed to acheive the result
          if(gamepad2.x){
              DropExtendINCH(20);
              Drop.setPower(0.005);
@@ -296,13 +298,8 @@ public class Test_GoBilda_DriveTrain extends OpMode {
          if(gamepad2.y){
              DropExtendINCH(0);
          }
+        Pick.setPower(gamepad2.right_trigger);
 
-         double temp=gamepad1.left_stick_y;
-         if (temp !=0) {
-             ExtendDrop=false;
-         }
-
-         Drop.setPower(-gamepad1.left_stick_y); // reverse
 
     }
 
@@ -401,6 +398,7 @@ public class Test_GoBilda_DriveTrain extends OpMode {
     }
 
     private void DropExtendINCH(double Inch){
+        runtime.reset();
         double pwr=0;
         double TargetPosition= Inch*COUNTS_PER_INCH;
         int currentPosition= Drop.getCurrentPosition();
@@ -532,13 +530,8 @@ public class Test_GoBilda_DriveTrain extends OpMode {
     }
 
     private void armIntake () {
-        arm.setPosition(0.099);
-        outake.setPosition(0.5);
-    }
-    private void armout () {
-        outake.setPosition(1);
-        Delay(2);
-        arm.setPosition(0.65);
+        arm.setPosition(0.20);
+        outake.setPosition(0.50);
     }
 
     /*private void DepositSpecimen() {
