@@ -5,6 +5,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.BlocksOpModeCompanion;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
@@ -33,6 +34,19 @@ public class IntoTheDeep_Auto_Drivetrain {
 
     private Servo outake;
 
+    private ElapsedTime runtime;
+
+    private Thread DropThread;
+
+    private Thread PickThread;
+
+    public   peakFTCServo SpecClawSrvo;
+    public peakFTCServo ClawServo;
+    public peakFTCServo OutakeServo;
+    public peakFTCServo HandServo;
+
+    public peakFTCServo armServo;
+
 
 
     //Calculation for motor to calculate inches
@@ -45,7 +59,13 @@ public class IntoTheDeep_Auto_Drivetrain {
             (WHEEL_DIAMETER_INCHES_GB_MW * 3.1415);
     static final double     COUNTS_PER_INCH_5202         = (COUNTS_PER_MOTOR_REV_5202 * DRIVE_GEAR_REDUCTION) /
             (WHEEL_DIAMETER_INCHES * 3.1415);
+    private boolean IsBreak;
 
+    private double DropInch;
+    private double PickInch;
+
+    private boolean DropExtendStart;
+    private boolean PickExtendStart;
 
 
     public IntoTheDeep_Auto_Drivetrain(HardwareMap hMap, Telemetry tel) {
@@ -108,8 +128,45 @@ public class IntoTheDeep_Auto_Drivetrain {
         //Running Drop and pick encoders
         Pick.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         Drop.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        //Servo creation group
+        SpecClawSrvo= new peakFTCServo(SpecClaw,Servo.Direction.FORWARD, 0, 1,0);
+        ClawServo= new peakFTCServo(claw, Servo.Direction.REVERSE, 0.4,0.8,0.4);
+        OutakeServo= new peakFTCServo(outake, Servo.Direction.REVERSE,0.75,0.2,0.5);
+        HandServo= new peakFTCServo(hand, Servo.Direction.FORWARD,0,1,0);
+        armServo=new peakFTCServo(arm, Servo.Direction.FORWARD,0.2,0.85,0.2);
+
+        runtime = new ElapsedTime();
+
+        //Thread for dropper slide
+
+        CreateDropThread();
+        startDropThread();
+        CreatePickThread();
+        startPickThread();
+        IsBreak=false;
+        PickExtendStart=false;
+        DropExtendStart=false;
     }
 
+    private void CreateDropThread(){
+        DropThread = new Thread(() -> {
+            //minumum things that we need
+            DropExtendHold();
+        });
+    }
+    private void CreatePickThread(){
+        PickThread = new Thread(() -> {
+            //minumum things that we need
+            PickExtendHold();
+        });
+    }
+    private void startDropThread(){
+        DropThread.start();
+    }
+    private void startPickThread(){
+        PickThread.start();
+    }
   private void setSlidesEncoder(double inch){
         double tar = inch*COUNTS_PER_INCH_5202;
 
@@ -144,10 +201,10 @@ public class IntoTheDeep_Auto_Drivetrain {
 
         setDriveTrainEncoder(inch);
         while (FLeft.isBusy() || Fright.isBusy() || BLeft.isBusy() || Bright.isBusy()) {
-            FLeft.setPower(.4);
-            Fright.setPower(.4);
-            Bright.setPower(.4);
-            BLeft.setPower(.4);
+            FLeft.setPower(1);
+            Fright.setPower(1);
+            Bright.setPower(1);
+            BLeft.setPower(1);
         }
        stopDriveTrain();
 
@@ -159,7 +216,7 @@ public class IntoTheDeep_Auto_Drivetrain {
         int targetCountFR = Fright.getCurrentPosition()+(int)targetCount;
         int targetCountBL = BLeft.getCurrentPosition()-(int)targetCount;
         int targetCountBR = Bright.getCurrentPosition()+(int)targetCount;
-        double pwr=.4;
+        double pwr=1;
         if(inch<0){
             pwr= pwr *(-1);
         }
@@ -190,7 +247,7 @@ public class IntoTheDeep_Auto_Drivetrain {
         int targetCountFR = Fright.getCurrentPosition()-(int)targetCount;
         int targetCountBL = BLeft.getCurrentPosition()-(int)targetCount;
         int targetCountBR = Bright.getCurrentPosition()+(int)targetCount;
-        double pwr=.4;
+        double pwr=1;
         if(inch<0){
             pwr= pwr *(-1);
         }
@@ -217,7 +274,93 @@ public class IntoTheDeep_Auto_Drivetrain {
 
 
     }
+    private void DropExtendHold(){
+        while (true) {
+            if (DropExtendStart){
+                DropExtendStart=false;
+            runtime.reset();
+            int timeout = 3;
+            double pwr = 0;
+            double TargetPosition = DropInch * COUNTS_PER_INCH_5202;
+            int currentPosition = Drop.getCurrentPosition();
+            int NewPosition = currentPosition + (int) TargetPosition;
+            if (DropInch > 0) {
+                pwr = 1;
+                timeout = 5;
+                Drop.setTargetPosition(NewPosition);// move up/forward to given inches.
+            } else if (DropInch < 0) {
+                pwr = -1;
+                Drop.setTargetPosition(NewPosition); // go back to the starting position
+            } else {
+                pwr = -1;
+                Drop.setTargetPosition(0); // go back to the starting position
+            }
+            Drop.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            Drop.setPower(pwr);
+            while (Drop.isBusy() && runtime.seconds() < timeout) {
+                Drop.setPower(pwr);
+            }
+
+            while (IsBreak) {
+                Drop.setPower(0.0012 * pwr);
+            }
+            Drop.setPower(0);
+
+        }}
+
+    }
+
+    private void PickExtendHold(){
+        while (true) {
+            if (PickExtendStart){
+                PickExtendStart=false;
+                runtime.reset();
+                int timeout = 3;
+                double pwr = 0;
+                double TargetPosition = PickInch * COUNTS_PER_INCH_5202;
+                int currentPosition = Pick.getCurrentPosition();
+                int NewPosition = currentPosition + (int) TargetPosition;
+                if (PickInch > 0) {
+                    pwr = 1;
+                    timeout = 5;
+                    Pick.setTargetPosition(NewPosition);// move up/forward to given inches.
+                } else if (PickInch < 0) {
+                    pwr = -1;
+                    Pick.setTargetPosition(NewPosition); // go back to the starting position
+                } else {
+                    pwr = -1;
+                    Pick.setTargetPosition(0); // go back to the starting position
+                }
+                Pick.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                Pick.setPower(pwr);
+                while (Pick.isBusy() && runtime.seconds() < timeout) {
+                    Pick.setPower(pwr);
+                }
+                Pick.setPower(0);
+
+            }}
+
+    }
+
+
+   public void DropExtendINCH(double Inches) {
+       DropInch=Inches;
+       DropExtendStart=true;
+       //tmpExtend();
+    }
+    public void PickExtendINCH(double Inches) {
+        PickInch=Inches;
+        PickExtendStart=true;
+        //tmpExtend();
+    }
+
+    public void OparateBreak(boolean IsSetBreak){
+        IsBreak=IsSetBreak;
+    }
+
+
+}
 
 
 
-}//class
+//class
