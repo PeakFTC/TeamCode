@@ -6,8 +6,11 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
+
+import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 @TeleOp
 public class Test_GoBilda_DriveTrain extends OpMode {
@@ -50,15 +53,18 @@ public class Test_GoBilda_DriveTrain extends OpMode {
 
     private peakFTCServo handServo;
     private peakFTCServo clawServo;
-    private peakFTCServo RoClawServo;
     private peakFTCServo SpecClawServo;
     private peakFTCServo armServo;
     private peakFTCServo outtakeServo;
 
+    //New classes for color sensor
+
+    private AutoColorSensor ColorSensor;
+
 
     private Servo outake;
     private double roClowPos;
-    static final double COUNTS_PER_MOTOR_REV_Gobilda_5203 = 537.7;    // eg: TETRIX Motor Encoder
+    static final double COUNTS_PER_MOTOR_REV_Gobilda_5203 = 384.5;    // eg: TETRIX Motor Encoder
     static final double DRIVE_GEAR_REDUCTION = 1.0;     // No External Gearing.
     static final double WHEEL_DIAMETER_INCHES = 1.5;     // For figuring circumference
     static final double     COUNTS_PER_INCH_5203         = (COUNTS_PER_MOTOR_REV_Gobilda_5203 * DRIVE_GEAR_REDUCTION) /
@@ -108,8 +114,11 @@ public class Test_GoBilda_DriveTrain extends OpMode {
         clawServo = new peakFTCServo(claw, Servo.Direction.REVERSE, 0.34, 0.8, 0.34);
         handServo = new peakFTCServo(hand, Servo.Direction.FORWARD, 0, 0.68, 0);
         SpecClawServo = new peakFTCServo(SpecClaw, Servo.Direction.FORWARD, 0, 1, 0);
-        outtakeServo = new peakFTCServo(outake, Servo.Direction.REVERSE, 0.75, 0.2, 0.5);
+        outtakeServo = new peakFTCServo(outake, Servo.Direction.REVERSE, 0.65, 0.2, 0.5);
         armServo = new peakFTCServo(arm, Servo.Direction.FORWARD, 0.8, 0.2, 0.8);
+
+        //Color sensor
+        ColorSensor=new AutoColorSensor(hardwareMap, telemetry);
 
         //Outake
         Drop.setDirection(DcMotorSimple.Direction.FORWARD);
@@ -118,7 +127,7 @@ public class Test_GoBilda_DriveTrain extends OpMode {
 
         //Servo Powers
         RoClaw.setPosition(0.45);
-        roClowPos = 0;
+        roClowPos = 0.45;
         // create/initialize all the required threads
         CreateSampleTransferThread();
         CreatSampleIntakeThread();
@@ -136,9 +145,9 @@ public class Test_GoBilda_DriveTrain extends OpMode {
                 ExtendDrop = false;
                 isHold = false;
                 DropExtendINCH(-8);
-                Delay(0.5);
+                Delay(0.1);
                 SpecClawServo.setPosition(peakFTCServo.SERVO_POSITION.POSITION_CLOSE);
-                Delay(1);
+                Delay(0.3);
                 DropExtendINCH(0);
                 ScoreSpec = false;
             }
@@ -432,7 +441,7 @@ public class Test_GoBilda_DriveTrain extends OpMode {
     private void PickExtendINCH(double Inch) {
         runtime.reset();
         double pwr = 0;
-        int timeout = 3;
+        int timeout = 2;
         double TargetPosition = Inch * COUNTS_PER_INCH_5203;
         int currentPosition = Pick.getCurrentPosition();
         int NewPosition = currentPosition + (int) TargetPosition;
@@ -499,15 +508,24 @@ public class Test_GoBilda_DriveTrain extends OpMode {
     private void GoToTheSample() {
         handDeposit();
         armIntake();
-        PickExtendINCH(10);
+        PickExtendINCH(13);
         handGrab();
         ClawOpen();
     }
 
     private void GrabTheSample() {
+        AutoColorSensor.DetectedColor ColorDeteceted;
         ClawClose();
-        Delay(0.5);
-        handDeposit();
+        Delay(0.3);
+        ColorDeteceted =ColorSensor.getDetetedColor();
+        if(ColorDeteceted == AutoColorSensor.DetectedColor.RED || ColorDeteceted == AutoColorSensor.DetectedColor.YELLOW)
+        {
+            handDeposit();
+        }
+        else{
+            ClawOpen();
+        }
+
     }
 
     private void setRotateClawAtReset() {
@@ -517,13 +535,14 @@ public class Test_GoBilda_DriveTrain extends OpMode {
     private void sampleDeposit() {
         armIntake();
         setRotateClawAtReset();
-        PickExtendINCH(-10);
+        PickExtendINCH(-13);
         outtakeServo.setPosition(peakFTCServo.SERVO_POSITION.POSITION_CLOSE);
-        Delay(0.5);
+        Delay(0.1);
         ClawOpen();
-        Delay(0.25);
+        Delay(0.1);
         armServo.setPosition(peakFTCServo.SERVO_POSITION.POSITION_CLOSE);
         ScoreSample();
+
     }
 
     private void ScoreSample() {
@@ -539,10 +558,10 @@ public class Test_GoBilda_DriveTrain extends OpMode {
     private void dropTheSample() {
         outtakeServo.setPosition(peakFTCServo.SERVO_POSITION.POSITION_OPEN);
         Drop.setPower(0.005);
-        Delay(0.5);
+        Delay(1);
         armIntake();
         Drop.setPower(0.005);
-        Delay(.5);
+        Delay(1.5);
         isHold = false;
         DropExtendINCH(0); // reset to 0 position
     }
